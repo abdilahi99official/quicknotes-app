@@ -1,12 +1,15 @@
-// --- TASK 4: Validation, Delete & Count ---
+// --- TASK 5: Persistence & Search (Final script.js) ---
 const noteForm = document.querySelector("#note-form");
 const noteInput = document.querySelector("#note-input");
 const noteCategory = document.querySelector("#note-category");
+const searchInput = document.querySelector("#search-input");
 const notesList = document.querySelector("#notes-list");
 const noteCount = document.querySelector("#note-count");
 const errorMessage = document.querySelector("#error-message");
+const clearAllBtn = document.querySelector("#clear-all-btn");
 
-let notes = [];
+// Load notes from localStorage or initialize empty array
+let notes = JSON.parse(localStorage.getItem("quicknotes")) || [];
 
 function getFormattedDate() {
     const now = new Date();
@@ -17,19 +20,32 @@ function getFormattedDate() {
     }) + ' at ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function render() {
+function render(notesToDisplay = notes) {
     notesList.textContent = "";
 
-    // Update grammar count message
     if (notes.length === 0) {
         noteCount.textContent = "You have no notes yet.";
+        if (clearAllBtn) clearAllBtn.style.display = "none";
     } else if (notes.length === 1) {
         noteCount.textContent = "You have 1 note.";
+        if (clearAllBtn) clearAllBtn.style.display = "block";
     } else {
         noteCount.textContent = `You have ${notes.length} notes.`;
+        if (clearAllBtn) clearAllBtn.style.display = "block";
     }
 
-    notes.forEach(note => {
+    // Handle empty search results state
+    if (notesToDisplay.length === 0 && notes.length > 0) {
+        const emptySearchLi = document.createElement("li");
+        emptySearchLi.textContent = "No notes match your search.";
+        emptySearchLi.style.padding = "1rem";
+        emptySearchLi.style.textAlign = "center";
+        emptySearchLi.style.color = "#64748b";
+        notesList.appendChild(emptySearchLi);
+        return;
+    }
+
+    notesToDisplay.forEach(note => {
         const li = document.createElement("li");
         li.className = `note-card category-${note.category}`;
 
@@ -55,7 +71,6 @@ function render() {
         contentDiv.appendChild(textP);
         contentDiv.appendChild(metaDiv);
 
-        // Delete Button implementation
         const deleteBtn = document.createElement("button");
         deleteBtn.type = "button";
         deleteBtn.className = "delete-btn";
@@ -69,12 +84,16 @@ function render() {
     });
 }
 
+// Save to localStorage helper
+function saveNotes() {
+    localStorage.setItem("quicknotes", JSON.stringify(notes));
+}
+
 function addNote(event) {
     event.preventDefault();
     const text = noteInput.value.trim();
     const category = noteCategory.value;
 
-    // Validation rules
     if (text === "") {
         errorMessage.textContent = "Please type a note first.";
         errorMessage.classList.remove("error-hidden");
@@ -87,7 +106,6 @@ function addNote(event) {
         return;
     }
 
-    // Clear error on success
     errorMessage.textContent = "";
     errorMessage.classList.add("error-hidden");
 
@@ -99,6 +117,7 @@ function addNote(event) {
     };
 
     notes.unshift(newNote);
+    saveNotes(); // Save state
     render();
 
     noteInput.value = "";
@@ -107,8 +126,42 @@ function addNote(event) {
 
 function deleteNote(id) {
     notes = notes.filter(note => note.id !== id);
-    render();
+    saveNotes(); // Save state
+
+    // Re-apply search filter if user is actively searching
+    const query = searchInput.value.trim().toLowerCase();
+    if (query) {
+        handleSearch();
+    } else {
+        render();
+    }
 }
 
+// Live search handler
+function handleSearch() {
+    const query = searchInput.value.trim().toLowerCase();
+    if (!query) {
+        render(notes);
+        return;
+    }
+    const filtered = notes.filter(note => note.text.toLowerCase().includes(query));
+    render(filtered);
+}
+
+// Event Listeners
 noteForm.addEventListener("submit", addNote);
+searchInput.addEventListener("input", handleSearch);
+
+if (clearAllBtn) {
+    clearAllBtn.addEventListener("click", () => {
+        if (confirm("Delete all notes?")) {
+            notes = [];
+            saveNotes();
+            render();
+            searchInput.value = "";
+        }
+    });
+}
+
+// Initial page load render
 render();
